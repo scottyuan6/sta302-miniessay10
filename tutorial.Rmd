@@ -1,0 +1,67 @@
+---
+title: "tutorial"
+output:
+  pdf_document: default
+  html_document: default
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+The academic paper titled "Modelling association football scores" by M.J. Maher, published in Statistica Neerlandica in 1982 discusses the application of the Poisson model to model football scores, contrasting previous studies that preferred the Negative Binomial distribution. The author incorporates parameters representing teams’ attacking and defensive strengths into the Poisson model, exploring various model structures to find the most suitable one. It's concluded that while there are some discrepancies, an independent Poisson model reasonably fits football scores. We built a simplified model and fitted it on a dataset containing International football results from 1872 to 2024 retrieved from https://www.kaggle.com/datasets/martj42/international-football-results-from-1872-to-2017. 
+
+```{r}
+# Load libraries
+library(tidyverse)
+library(lubridate)
+library(broom)
+library(MASS)
+
+# Load the data
+matches <- read.csv("results.csv")
+```
+
+Just like the paper, we limited our scope to a limited period of time. 
+
+```{r}
+# Filter for recent data
+recent_matches <- matches %>% 
+  mutate(date = ymd(date)) %>% 
+  filter(date > as.Date("2015-01-01"))
+```
+
+First we fitted a Poisson regression model on Home scores without any covariates, as the purpose is to compare Poisson and Negative Binomial on this count data. Summary of the estimated model is shown below.
+
+```{r}
+# Poisson Regression Model for Home Scores
+home_poisson_model <- glm(home_score ~ 1, family = poisson(link = "log"), data = recent_matches)
+summary(home_poisson_model)
+```
+
+```{r}
+library(AER) 
+overdispersion_test <- dispersiontest(home_poisson_model, trafo = 1, alternative = "greater")
+print(overdispersion_test)
+```
+
+The statistical test of presence of overdispersion of the Poisson model is highly significant, indicating significant overdispersion in the data as detected through the model. 
+
+Next we fitted a Negative binomial model to account for overdispersion in the data and compare with the Poisson model. Summary of the estimated model is shown below.`
+
+```{r}
+# Negative binomial model for over-dispersion in count data
+home_nb_model <- glm.nb(home_score ~ 1, data = recent_matches)
+summary(home_nb_model)
+```
+
+We did not fit a logistic regression model since the data is count type, not binary. 
+
+The AIC of the Poisson model is 29444 while that of the Negative Binomial is 28405, making the latter better in terms of model fit to the data. 
+
+
+In the analysis of football scores, the Negative Binomial regression model is preferred over the Poisson regression due to significant evidence of overdispersion present in the data. Overdispersion occurs when the observed variance is greater than the mean, a scenario common in count data like football scores where factors such as team strategy, player performance, and other unmeasured variables can introduce extra variability. The Negative Binomial model, by introducing an extra parameter to account for this overdispersion, provides a more flexible and accurate fit for such data. Additionally, the Akaike Information Criterion (AIC), a measure of model quality that penalizes for complexity, is lower for the Negative Binomial model than for the Poisson model in this case. A lower AIC indicates a better model fit when comparing models on the same dataset, suggesting that the Negative Binomial model not only addresses the overdispersion more effectively but also improves the overall model fit without overfitting. Therefore, considering both the statistical evidence of overdispersion and the lower AIC value, the Negative Binomial regression emerges as a more suitable choice for modeling football scores under these conditions.
+
+
+
